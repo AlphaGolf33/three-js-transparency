@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader";
 import backgroundSrc from "../assets/background.jpg?url";
+import envmapSrc from "../assets/envmap.hdr?url";
 import logoSrc from "../assets/logo.glb?url";
 
 class Main {
@@ -9,6 +11,7 @@ class Main {
 	private scene: THREE.Scene;
 	private camera: THREE.PerspectiveCamera;
 	private controls: OrbitControls;
+	private mesh?: THREE.Mesh;
 
 	constructor() {
 		// Create WebGL renderer
@@ -43,8 +46,7 @@ class Main {
 
 	async start() {
 		// Create background
-		const textureLoader = new THREE.TextureLoader();
-		const backgroundTexture = await textureLoader.loadAsync(backgroundSrc);
+		const backgroundTexture = await new THREE.TextureLoader().loadAsync(backgroundSrc);
 		backgroundTexture.colorSpace = THREE.SRGBColorSpace;
 		const backgroundGeometry = new THREE.PlaneGeometry(100, 100);
 		const backgroundMaterial = new THREE.MeshBasicMaterial({ map: backgroundTexture });
@@ -53,25 +55,35 @@ class Main {
 		this.scene.add(backgroundMesh);
 
 		// Create 3D logo
-		const gltfLoader = new GLTFLoader();
-		const gltf = await gltfLoader.loadAsync(logoSrc);
+		const gltf = await new GLTFLoader().loadAsync(logoSrc);
 		const geometry = (gltf.scene.children[0].children[0] as THREE.Mesh).geometry.clone();
 		geometry.center();
 		geometry.rotateX(-Math.PI / 2);
 
-		const material = new THREE.MeshBasicMaterial({
-			color: 0x0000ff,
+		const envMap = await new RGBELoader().loadAsync(envmapSrc);
+		envMap.mapping = THREE.EquirectangularReflectionMapping;
+
+		const material = new THREE.MeshPhysicalMaterial({
+			color: 0x3030ff,
+			roughness: 0.1,
+			transmission: 1,
+			thickness: 10,
+			ior: 1.5,
+			envMap,
 		});
 
-		const mesh = new THREE.Mesh(geometry, material);
+		this.mesh = new THREE.Mesh(geometry, material);
 
-		this.scene.add(mesh);
+		this.scene.add(this.mesh);
 	}
 
 	update() {
 		this.renderer.render(this.scene, this.camera);
 		this.controls.update();
 		requestAnimationFrame(this.update.bind(this));
+
+		this.mesh?.rotateY(0.01);
+		this.mesh?.rotateX(0.005);
 	}
 }
 
